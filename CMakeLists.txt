@@ -634,6 +634,36 @@ else()
   set(SUPPORT_KLEE_UCLIBC 0) # For config.h
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+  option(ENABLE_FREEBSD_LIBC "Enable support for FreeBSD libc" ON)
+  if(ENABLE_FREEBSD_LIBC)
+    message(STATUS "klee-freebsd-libc support enabled")
+    set(SUPPORT_FREEBSD_LIBC 1) # For config.h
+    set(KLEE_FREEBSD_LIBC_PATH "/usr/local/lib" CACHE PATH "Path to directory containing libc.bca")
+    set(KLEE_FREEBSD_LIBC_BCA "${KLEE_FREEBSD_LIBC_PATH}/libc.bca")
+    if(NOT EXISTS ${KLEE_FREEBSD_LIBC_BCA})
+        message(FATAL_ERROR "libc.bca library not found at \"${KLEE_FREEBSD_LIBC_BCA}\"")
+    endif()
+
+    file(MAKE_DIRECTORY "${KLEE_RUNTIME_DIRECTORY}")
+    execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
+        "${KLEE_FREEBSD_LIBC_BCA}"
+        "${KLEE_RUNTIME_DIRECTORY}/libc.bca"
+    )
+    list(APPEND KLEE_COMPONENT_CXX_DEFINES
+        -DKLEE_FREEBSD_LIBC_BCA_NAME=\"libc.bca\")
+
+    # Add klee-uclibc to the install target. We install the original
+    # file rather than the symlink because CMake would just copy the symlink
+    # rather than the file.
+    install(FILES "${KLEE_FREEBSD_LIBC_PATH}/libc.bca"
+        DESTINATION "${KLEE_INSTALL_RUNTIME_DIR}"
+        )
+  else()
+    set(SUPPORT_FREEBSD_LIBC 0) # For config.h
+  endif()
+endif()
+
 ################################################################################
 # KLEE libcxx support
 ################################################################################

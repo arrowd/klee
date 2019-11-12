@@ -137,7 +137,7 @@ namespace {
   RunInDir("run-in-dir",
            cl::desc("Change to the given directory before starting execution (default=location of tested file)."),
            cl::cat(StartCat));
-  
+
   cl::opt<std::string>
   OutputDir("output-dir",
             cl::desc("Directory in which to write results (default=klee-out-<N>)"),
@@ -159,7 +159,7 @@ namespace {
   WarnAllExternals("warn-all-external-symbols",
                    cl::desc("Issue a warning on startup for all external symbols (default=false)."),
                    cl::cat(StartCat));
-  
+
 
   /*** Linking options ***/
 
@@ -224,10 +224,10 @@ namespace {
 
 
   /*** Replaying options ***/
-  
+
   cl::OptionCategory ReplayCat("Replaying options",
                                "These options impact replaying of test cases.");
-  
+
   cl::opt<bool>
   ReplayKeepSymbolic("replay-keep-symbolic",
                      cl::desc("Replay the test cases only by asserting "
@@ -1015,13 +1015,6 @@ static void halt_via_gdb(int pid) {
     perror("system");
 }
 
-#ifndef SUPPORT_KLEE_UCLIBC
-static void
-linkWithUclibc(StringRef libDir,
-               std::vector<std::unique_ptr<llvm::Module>> &modules) {
-  klee_error("invalid libc, no uclibc support!\n");
-}
-#else
 static void replaceOrRenameFunction(llvm::Module *module,
 		const char *old_name, const char *new_name)
 {
@@ -1038,6 +1031,8 @@ static void replaceOrRenameFunction(llvm::Module *module,
     }
   }
 }
+
+#ifdef SUPPORT_KLEE_UCLIBC
 
 static void
 createLibCWrapper(std::vector<std::unique_ptr<llvm::Module>> &modules,
@@ -1129,6 +1124,31 @@ linkWithUclibc(StringRef libDir,
 
   createLibCWrapper(modules, EntryPoint, "__uClibc_main");
   klee_message("NOTE: Using klee-uclibc : %s", uclibcBCA.c_str());
+}
+#endif
+#ifdef SUPPORT_FREEBSD_LIBC
+static void
+linkWithUclibc(StringRef libDir,
+               std::vector<std::unique_ptr<llvm::Module>> &modules) {
+  LLVMContext &ctx = modules[0]->getContext();
+
+  size_t newModules = modules.size();
+
+  SmallString<128> libcBCA(libDir);
+  std::string errorMsg;
+  llvm::sys::path::append(libcBCA, KLEE_FREEBSD_LIBC_BCA_NAME);
+  if (!klee::loadFile(libcBCA.c_str(), ctx, modules, errorMsg))
+    klee_error("Cannot find FreeBSD libc '%s': %s", libcBCA.c_str(),
+               errorMsg.c_str());
+
+  klee_message("NOTE: Using FreeBSD libc : %s", libcBCA.c_str());
+}
+#endif
+#if !defined(SUPPORT_KLEE_UCLIBC) && !defined(SUPPORT_FREEBSD_LIBC)
+static void
+linkWithUclibc(StringRef libDir,
+               std::vector<std::unique_ptr<llvm::Module>> &modules) {
+  klee_error("invalid libc, no uclibc support!\n");
 }
 #endif
 

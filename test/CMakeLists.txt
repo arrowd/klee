@@ -21,7 +21,7 @@ set(TARGET_TRIPLE "${TARGET_TRIPLE}")
 # FIXME: Do this to avoid changing the template file that
 # is shared by both build systems.
 if (ENABLE_POSIX_RUNTIME)
-  if (ENABLE_KLEE_UCLIBC)
+  if (ENABLE_KLEE_UCLIBC OR ENABLE_FREEBSD_LIBC)
     set(ENABLE_POSIX_RUNTIME 1)
   else()
     message(AUTHOR_WARNING

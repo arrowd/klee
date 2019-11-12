@@ -89,6 +89,9 @@
 /* klee-uclibc is supported */
 #cmakedefine SUPPORT_KLEE_UCLIBC @SUPPORT_KLEE_UCLIBC@
 
+/* FreeBSD libc is supported */
+#cmakedefine SUPPORT_FREEBSD_LIBC @SUPPORT_FREEBSD_LIBC@
+
 /* libcxx is supported */
 #cmakedefine SUPPORT_KLEE_LIBCXX @SUPPORT_KLEE_LIBCXX@
 

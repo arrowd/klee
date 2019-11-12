@@ -147,6 +147,8 @@ static bool linkTwoModules(llvm::Module *Dest,
                            std::string &errorMsg) {
   // Get the potential error message (Src is moved and won't be available later)
   errorMsg = "Linking module " + Src->getModuleIdentifier() + " failed";
+  KLEE_DEBUG_WITH_TYPE("klee_linker",
+                       dbgs() << "Linking in " << Src->getModuleIdentifier() << "\n");
   auto linkResult = Linker::linkModules(*Dest, std::move(Src));
 
   return !linkResult;
