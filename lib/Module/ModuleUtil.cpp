@@ -55,7 +55,7 @@
 
 using namespace llvm;
 using namespace klee;
-
+#define KLEE_DEBUG_WITH_TYPE(x,y) y
 /// Based on GetAllUndefinedSymbols() from LLVM3.2
 ///
 /// GetAllUndefinedSymbols - calculates the set of undefined symbols that still

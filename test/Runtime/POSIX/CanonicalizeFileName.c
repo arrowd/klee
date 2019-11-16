@@ -1,4 +1,5 @@
 // REQUIRES: not-darwin
+// REQUIRES: not-freebsd
 // RUN: %clang %s -Wall -emit-llvm -g %O0opt -c -o %t.bc
 // RUN: rm -rf %t.klee-out
 // RUN: %klee --output-dir=%t.klee-out --libc=uclibc --posix-runtime --exit-on-error %t.bc

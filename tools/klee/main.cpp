@@ -166,7 +166,7 @@ namespace {
   cl::OptionCategory LinkCat("Linking options",
                              "These options control the libraries being linked.");
 
-  enum class LibcType { FreeStandingLibc, KleeLibc, UcLibc };
+  enum class LibcType { FreeStandingLibc, KleeLibc, UcLibc, FreeBSDLibc };
 
   cl::opt<LibcType>
   Libc("libc",
@@ -178,8 +178,12 @@ namespace {
                   clEnumValN(LibcType::KleeLibc,
                              "klee",
                              "Link in KLEE's libc"),
-                  clEnumValN(LibcType::UcLibc, "uclibc",
-                             "Link in uclibc (adapted for KLEE)")
+#ifndef __FreeBSD__
+                  clEnumValN(LibcType::UcLibc, "real",
+#else
+                  clEnumValN(LibcType::FreeBSDLibc, "real",
+#endif
+                             "Link in real libc - either uclibc (adapted for KLEE) or FreeBSD libc")
                   KLEE_LLVM_CL_VAL_END),
        cl::init(LibcType::FreeStandingLibc),
        cl::cat(LinkCat));
@@ -715,7 +719,7 @@ preparePOSIX(std::vector<std::unique_ptr<llvm::Module>> &loadedModules,
   // link against a libc implementation. Preparing for libc linking (i.e.
   // linking with uClibc will expect a main function and rename it to
   // _user_main. We just provide the definition here.
-  if (!libCPrefix.empty() && !mainFn->getParent()->getFunction(EntryPoint))
+  if (Libc == LibcType::UcLibc && !mainFn->getParent()->getFunction(EntryPoint))
     llvm::Function::Create(mainFn->getFunctionType(),
                            llvm::Function::ExternalLinkage, EntryPoint,
                            mainFn->getParent());
@@ -731,6 +735,25 @@ preparePOSIX(std::vector<std::unique_ptr<llvm::Module>> &loadedModules,
   // Rename the POSIX wrapper to prefixed entrypoint, e.g. _user_main as uClibc
   // would expect it or main otherwise
   wrapper->setName(libCPrefix + EntryPoint);
+
+  if (Libc == LibcType::FreeBSDLibc)
+  {
+      auto* wrapperFn = llvm::Function::Create(wrapper->getFunctionType(),
+                                               llvm::Function::ExternalLinkage, wrapper->getName(),
+                                               mainFn->getParent());
+
+      mainFn = llvm::Function::Create(wrapper->getFunctionType(),
+                                      llvm::Function::ExternalLinkage, EntryPoint,
+                                      mainFn->getParent());
+
+      auto* entryBB = BasicBlock::Create(mainFn->getParent()->getContext(), "entry", mainFn);
+
+      std::vector<llvm::Value*> args;
+      for(auto& arg : mainFn->args())
+          args.push_back(&arg);
+      auto* ret = CallInst::Create(wrapperFn, args, "", entryBB);
+      ReturnInst::Create(mainFn->getParent()->getContext(), ret, entryBB);
+  }
 }
 
 
@@ -900,6 +923,7 @@ void externalsAndGlobalsCheck(const llvm::Module *m) {
                     dontCareUclibc+NELEMS(dontCareUclibc));
     break;
   case LibcType::FreeStandingLibc: /* silence compiler warning */
+  case LibcType::FreeBSDLibc:
     break;
   }
 
@@ -1128,7 +1152,7 @@ linkWithUclibc(StringRef libDir,
 #endif
 #ifdef SUPPORT_FREEBSD_LIBC
 static void
-linkWithUclibc(StringRef libDir,
+linkWithFreeBSDLibc(StringRef libDir,
                std::vector<std::unique_ptr<llvm::Module>> &modules) {
   LLVMContext &ctx = modules[0]->getContext();
 
@@ -1144,7 +1168,7 @@ linkWithUclibc(StringRef libDir,
   klee_message("NOTE: Using FreeBSD libc : %s", libcBCA.c_str());
 }
 #endif
-#if !defined(SUPPORT_KLEE_UCLIBC) && !defined(SUPPORT_FREEBSD_LIBC)
+#if !defined(SUPPORT_KLEE_UCLIBC)
 static void
 linkWithUclibc(StringRef libDir,
                std::vector<std::unique_ptr<llvm::Module>> &modules) {
@@ -1274,6 +1298,8 @@ int main(int argc, char **argv, char **envp) {
                  errorMsg.c_str());
 
     std::string libcPrefix = (Libc == LibcType::UcLibc ? "__user_" : "");
+    if(Libc == LibcType::FreeBSDLibc)
+        libcPrefix = "_";
     preparePOSIX(loadedModules, libcPrefix);
   }
 
@@ -1313,6 +1339,9 @@ int main(int argc, char **argv, char **envp) {
   }
   case LibcType::UcLibc:
     linkWithUclibc(LibraryDir, loadedModules);
+    break;
+  case LibcType::FreeBSDLibc:
+    linkWithFreeBSDLibc(LibraryDir, loadedModules);
     break;
   }
 
