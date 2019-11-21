@@ -108,6 +108,8 @@ namespace klee {
     // Mark function with functionName as part of the KLEE runtime
     void addInternalFunction(const char* functionName);
 
+    void resolveWeakReferences();
+
   public:
     KModule() = default;
 
